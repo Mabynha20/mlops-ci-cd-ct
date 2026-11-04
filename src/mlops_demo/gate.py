@@ -19,23 +19,27 @@ from mlops_demo.evaluate import avaliar
 
 
 def decidir(candidato: dict, campeao: dict) -> dict:
-    """Aplica as regras do portão a duas dicts de métricas e devolve o veredito."""
+    """Aplica as regras do portão a duas dicts de métricas e devolve o veredito.
+
+    Regras (contrato em config.py): precisão de spam mínima, recall de spam mínimo e o candidato
+    não pode ter precisão menor que a do campeão, medida no mesmo conjunto.
+    """
+    principal, secundaria = config.METRICA_PRINCIPAL, config.METRICA_SECUNDARIA
     verificacoes = [
         {
-            "regra": f"recall maligno do candidato >= {config.RECALL_MINIMO:.2f}",
-            "ok": candidato["recall_maligno"] >= config.RECALL_MINIMO,
-            "valor": round(candidato["recall_maligno"], 4),
+            "regra": f"precisão de spam do candidato >= {config.PRECISAO_MINIMA:.2f}",
+            "ok": candidato[principal] >= config.PRECISAO_MINIMA,
+            "valor": round(candidato[principal], 4),
         },
         {
-            "regra": f"precisão maligna do candidato >= {config.PRECISAO_MINIMA:.2f}",
-            "ok": candidato["precisao_maligna"] >= config.PRECISAO_MINIMA,
-            "valor": round(candidato["precisao_maligna"], 4),
+            "regra": f"recall de spam do candidato >= {config.RECALL_MINIMO:.2f}",
+            "ok": candidato[secundaria] >= config.RECALL_MINIMO,
+            "valor": round(candidato[secundaria], 4),
         },
         {
-            "regra": "recall maligno do candidato >= recall do campeão (mesmo conjunto)",
-            "ok": candidato["recall_maligno"]
-            >= campeao["recall_maligno"] - config.TOLERANCIA_CAMPEAO,
-            "valor": f"{candidato['recall_maligno']:.4f} x {campeao['recall_maligno']:.4f}",
+            "regra": "precisão de spam do candidato >= precisão do campeão (mesmo conjunto)",
+            "ok": candidato[principal] >= campeao[principal] - config.TOLERANCIA_CAMPEAO,
+            "valor": f"{candidato[principal]:.4f} x {campeao[principal]:.4f}",
         },
     ]
     return {
@@ -49,11 +53,12 @@ def decidir(candidato: dict, campeao: dict) -> dict:
 def resumo_markdown(resultado: dict) -> str:
     """Texto em Markdown, usado no GITHUB_STEP_SUMMARY e no corpo do PR."""
     selo = "APROVADO: o candidato pode virar campeão" if resultado["aprovado"] else "REPROVADO"
+    principal, secundaria = config.METRICA_PRINCIPAL, config.METRICA_SECUNDARIA
     linhas = [f"## Portão de qualidade: {selo}", ""]
-    linhas += ["| Modelo | Recall maligno | Precisão maligna | Amostras |", "|---|---|---|---|"]
+    linhas += ["| Modelo | Precisão spam | Recall spam | Amostras |", "|---|---|---|---|"]
     for nome in ("campeao", "candidato"):
         m = resultado[nome]
-        celulas = [nome, f"{m['recall_maligno']:.3f}", f"{m['precisao_maligna']:.3f}"]
+        celulas = [nome, f"{m[principal]:.3f}", f"{m[secundaria]:.3f}"]
         linhas.append("| " + " | ".join([*celulas, str(m["n_amostras"])]) + " |")
     linhas += ["", "| Regra | Resultado | Valor |", "|---|---|---|"]
     for v in resultado["verificacoes"]:
